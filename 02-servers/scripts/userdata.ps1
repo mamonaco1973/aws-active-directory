@@ -38,7 +38,7 @@ New-ADUser -Name "jsmith" `
     -Surname "Smith" `
     -DisplayName "John Smith" `
     -EmailAddress "jsmith@mikecloud.com" `
-    -UserPrincipalName "jsmith" `
+    -UserPrincipalName "jsmith@mikecloud.com" `
     -SamAccountName "jsmith" `
     -AccountPassword $password `
     -Enabled $true `
@@ -61,7 +61,7 @@ New-ADUser -Name "edavis" `
     -Surname "Davis" `
     -DisplayName "Emily Davis" `
     -EmailAddress "edavis@mikecloud.com" `
-    -UserPrincipalName "edavis" `
+    -UserPrincipalName "edavis@mikecloud.com" `
     -SamAccountName "edavis" `
     -AccountPassword $password `
     -Enabled $true `
@@ -83,7 +83,7 @@ New-ADUser -Name "rpatel" `
     -Surname "Patel" `
     -DisplayName "Raj Patel" `
     -EmailAddress "rpatel@mikecloud.com" `
-    -UserPrincipalName "rpatel" `
+    -UserPrincipalName "rpatel@mikecloud.com" `
     -SamAccountName "rpatel" `
     -AccountPassword $password `
     -Enabled $true `
@@ -106,7 +106,7 @@ New-ADUser -Name "akumar" `
     -Surname "Kumar" `
     -DisplayName "Amit Kumar" `
     -EmailAddress "akumar@mikecloud.com" `
-    -UserPrincipalName "akumar" `
+    -UserPrincipalName "akumar@mikecloud.com" `
     -SamAccountName "akumar" `
     -AccountPassword $password `
     -Enabled $true `
@@ -120,6 +120,17 @@ Add-ADGroupMember -Identity "india" -Members akumar -credential $cred
 # Grant all users RDP access to this machine
 
 Add-LocalGroupMember -Group "Remote Desktop Users" -Member mcloud-users
+
+# Retrieve the instance ID from AWS EC2 metadata using IMDSv2 (Instance Metadata Service Version 2)
+$token = Invoke-RestMethod -Method Put -Uri "http://169.254.169.254/latest/api/token" -Headers @{ "X-aws-ec2-metadata-token-ttl-seconds" = "21600" }
+$instanceId = Invoke-RestMethod -Uri "http://169.254.169.254/latest/meta-data/instance-id" -Headers @{ "X-aws-ec2-metadata-token" = $token }
+
+# Retrieve IAM instance profile association ID for the current EC2 instance
+$associationId = aws ec2 describe-iam-instance-profile-associations --filters "Name=instance-id,Values=$instanceId" --query "IamInstanceProfileAssociations[0].AssociationId" --output text
+
+# Reassign the instance IAM profile to a less privileged profile
+$profileName = "EC2SSMProfile"
+aws ec2 replace-iam-instance-profile-association --iam-instance-profile Name=$profileName --association-id $associationId
 
 # Shutdown and reboot server to finalize domain join
 

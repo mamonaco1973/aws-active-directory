@@ -51,7 +51,7 @@ resource "aws_iam_policy" "secrets_policy" {
           data.aws_secretsmanager_secret.akumar_secret.arn
         ]
       },
-      
+
       # Permissions to Disassociate IAM Instance Profile from EC2
       {
         Effect = "Allow"
@@ -62,6 +62,12 @@ resource "aws_iam_policy" "secrets_policy" {
           "ec2:ReplaceIamInstanceProfileAssociation"
         ]
         Resource = "*"
+      },
+
+      {
+        Effect = "Allow"
+        Action = "iam:PassRole"
+        Resource = "${aws_iam_role.ec2_ssm_role.arn}"
       }
     ]
   })
