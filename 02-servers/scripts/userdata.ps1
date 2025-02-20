@@ -1,139 +1,131 @@
 <powershell>
 
-# Install AD Components
+# ------------------------------------------------------------
+# Install Active Directory Components
+# ------------------------------------------------------------
 
+# Suppress progress bars to speed up execution
 $ProgressPreference = 'SilentlyContinue'
+
+# Install required Windows Features for Active Directory management
 Install-WindowsFeature -Name GPMC,RSAT-AD-PowerShell,RSAT-AD-AdminCenter,RSAT-ADDS-Tools,RSAT-DNS-Server
 
-# Download and install AWS CLI
+# ------------------------------------------------------------
+# Download and Install AWS CLI
+# ------------------------------------------------------------
 
 Write-Host "Installing AWS CLI..."
+
+# Download the AWS CLI installer to the Administrator's folder
 Invoke-WebRequest https://awscli.amazonaws.com/AWSCLIV2.msi -OutFile C:\Users\Administrator\AWSCLIV2.msi
-Start-Process "msiexec" -argumentlist "/i C:\Users\Administrator\AWSCLIV2.msi /qn" -Wait -NoNewWindow
+
+# Run the installer silently without user interaction
+Start-Process "msiexec" -ArgumentList "/i C:\Users\Administrator\AWSCLIV2.msi /qn" -Wait -NoNewWindow
+
+# Manually append AWS CLI to system PATH for immediate availability
 $env:Path += ";C:\Program Files\Amazon\AWSCLIV2"
 
-# Join instance to active directory
+# ------------------------------------------------------------
+# Join EC2 Instance to Active Directory
+# ------------------------------------------------------------
 
+# Retrieve domain admin credentials from AWS Secrets Manager
 $secretValue = aws secretsmanager get-secret-value --secret-id ${admin_secret} --query SecretString --output text
 $secretObject = $secretValue | ConvertFrom-Json
-$password = $secretObject.password | ConvertTo-SecureString -asPlainText -Force
-$cred = New-Object -typename System.Management.Automation.PSCredential -argumentlist $secretObject.username, $password
+$password = $secretObject.password | ConvertTo-SecureString -AsPlainText -Force
+$cred = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $secretObject.username, $password
+
+# Join the EC2 instance to the Active Directory domain
 Add-Computer -DomainName "${domain_fqdn}" -Credential $cred -Force -OUPath "${computers_ou}"
 
-# Create some users and groups for testing
+# ------------------------------------------------------------
+# Create AD Groups for User Management
+# ------------------------------------------------------------
 
-New-ADGroup -Name "mcloud-users" -GroupCategory Security -GroupScope Universal -credential $cred -OtherAttributes @{gidNumber='10001'}
-New-ADGroup -Name "india" -GroupCategory Security -GroupScope Universal -credential $cred -OtherAttributes @{gidNumber='10002'}
-New-ADGroup -Name "us" -GroupCategory Security -GroupScope Universal -credential $cred -OtherAttributes @{gidNumber='10003'}
-New-ADGroup -Name "linux-admins" -GroupCategory Security -GroupScope Universal -credential $cred -OtherAttributes @{gidNumber='10004'}
+New-ADGroup -Name "mcloud-users" -GroupCategory Security -GroupScope Universal -Credential $cred -OtherAttributes @{gidNumber='10001'}
+New-ADGroup -Name "india" -GroupCategory Security -GroupScope Universal -Credential $cred -OtherAttributes @{gidNumber='10002'}
+New-ADGroup -Name "us" -GroupCategory Security -GroupScope Universal -Credential $cred -OtherAttributes @{gidNumber='10003'}
+New-ADGroup -Name "linux-admins" -GroupCategory Security -GroupScope Universal -Credential $cred -OtherAttributes @{gidNumber='10004'}
 
-# Create John Smith
+# ------------------------------------------------------------
+# Create AD Users and Assign to Groups
+# ------------------------------------------------------------
 
-$secretValue = aws secretsmanager get-secret-value --secret-id jsmith_ad_credentials --query SecretString --output text
-$secretObject = $secretValue | ConvertFrom-Json
-$password = $secretObject.password | ConvertTo-SecureString -asPlainText -Force
+# Initialize a counter for uidNumber
+$uidCounter = 10000 
 
-New-ADUser -Name "jsmith" `
-    -GivenName "John" `
-    -Surname "Smith" `
-    -DisplayName "John Smith" `
-    -EmailAddress "jsmith@mikecloud.com" `
-    -UserPrincipalName "jsmith@mikecloud.com" `
-    -SamAccountName "jsmith" `
-    -AccountPassword $password `
-    -Enabled $true `
-    -Credential $cred `
-    -PasswordNeverExpires $true `
-    -OtherAttributes @{gidNumber='10001'; uidNumber='10001'}
+# Function to create an AD user from AWS Secrets Manager
+function Create-ADUserFromSecret {
+    param (
+        [string]$SecretId,
+        [string]$GivenName,
+        [string]$Surname,
+        [string]$DisplayName,
+        [string]$Email,
+        [string]$Username,
+        [array]$Groups
+    )
 
-Add-ADGroupMember -Identity "mcloud-users" -Members jsmith -credential $cred
-Add-ADGroupMember -Identity "us" -Members jsmith -credential $cred
-Add-ADGroupMember -Identity "linux-admins" -Members jsmith -credential $cred
+    # Increment the uidCounter for each new user
+    $global:uidCounter++
+    $uidNumber = $global:uidCounter
 
-# Create Emily Davis
+    $secretValue = aws secretsmanager get-secret-value --secret-id $SecretId --query SecretString --output text
+    $secretObject = $secretValue | ConvertFrom-Json
+    $password = $secretObject.password | ConvertTo-SecureString -AsPlainText -Force
 
-$secretValue = aws secretsmanager get-secret-value --secret-id edavis_ad_credentials --query SecretString --output text
-$secretObject = $secretValue | ConvertFrom-Json
-$password = $secretObject.password | ConvertTo-SecureString -asPlainText -Force
+    # Create the AD user
+    New-ADUser -Name $Username `
+        -GivenName $GivenName `
+        -Surname $Surname `
+        -DisplayName $DisplayName `
+        -EmailAddress $Email `
+        -UserPrincipalName $Email `
+        -SamAccountName $Username `
+        -AccountPassword $password `
+        -Enabled $true `
+        -Credential $cred `
+        -PasswordNeverExpires $true `
+        -OtherAttributes @{gidNumber='10001'; uidNumber=$uidNumber}
+    
+    # Add the user to specified groups
+    foreach ($group in $Groups) {
+        Add-ADGroupMember -Identity $group -Members $Username -Credential $cred
+    }
+}
 
-New-ADUser -Name "edavis" `
-    -GivenName "Emily" `
-    -Surname "Davis" `
-    -DisplayName "Emily Davis" `
-    -EmailAddress "edavis@mikecloud.com" `
-    -UserPrincipalName "edavis@mikecloud.com" `
-    -SamAccountName "edavis" `
-    -AccountPassword $password `
-    -Enabled $true `
-    -Credential $cred `
-    -PasswordNeverExpires $true `
-    -OtherAttributes @{gidNumber='10001'; uidNumber='10002'}
+# Create users with predefined groups
+Create-ADUserFromSecret "jsmith_ad_credentials" "John" "Smith" "John Smith" "jsmith@mikecloud.com" "jsmith" @("mcloud-users", "us", "linux-admins")
+Create-ADUserFromSecret "edavis_ad_credentials" "Emily" "Davis" "Emily Davis" "edavis@mikecloud.com" "edavis" @("mcloud-users", "us")
+Create-ADUserFromSecret "rpatel_ad_credentials" "Raj" "Patel" "Raj Patel" "rpatel@mikecloud.com" "rpatel" @("mcloud-users", "india", "linux-admins")
+Create-ADUserFromSecret "akumar_ad_credentials" "Amit" "Kumar" "Amit Kumar" "akumar@mikecloud.com" "akumar" @("mcloud-users", "india")
 
-Add-ADGroupMember -Identity "mcloud-users" -Members edavis -credential $cred
-Add-ADGroupMember -Identity "us" -Members edavis -credential $cred
+# ------------------------------------------------------------
+# Grant RDP Access to All Users in "mcloud-users" Group
+# ------------------------------------------------------------
 
-# Create Raj Patel
+Add-LocalGroupMember -Group "Remote Desktop Users" -Member "mcloud-users"
 
-$secretValue = aws secretsmanager get-secret-value --secret-id rpatel_ad_credentials --query SecretString --output text
-$secretObject = $secretValue | ConvertFrom-Json
-$password = $secretObject.password | ConvertTo-SecureString -asPlainText -Force
+# ------------------------------------------------------------
+# Retrieve AWS Metadata and Modify IAM Profile
+# ------------------------------------------------------------
 
-New-ADUser -Name "rpatel" `
-    -GivenName "Raj" `
-    -Surname "Patel" `
-    -DisplayName "Raj Patel" `
-    -EmailAddress "rpatel@mikecloud.com" `
-    -UserPrincipalName "rpatel@mikecloud.com" `
-    -SamAccountName "rpatel" `
-    -AccountPassword $password `
-    -Enabled $true `
-    -Credential $cred `
-    -PasswordNeverExpires $true `
-    -OtherAttributes @{gidNumber='10001'; uidNumber='10003'}
-
-Add-ADGroupMember -Identity "mcloud-users" -Members rpatel -credential $cred
-Add-ADGroupMember -Identity "india" -Members rpatel -credential $cred
-Add-ADGroupMember -Identity "linux-admins" -Members rpatel -credential $cred
-
-# Create Amit Kumar
-
-$secretValue = aws secretsmanager get-secret-value --secret-id akumar_ad_credentials --query SecretString --output text
-$secretObject = $secretValue | ConvertFrom-Json
-$password = $secretObject.password | ConvertTo-SecureString -asPlainText -Force
-
-New-ADUser -Name "akumar" `
-    -GivenName "Amit" `
-    -Surname "Kumar" `
-    -DisplayName "Amit Kumar" `
-    -EmailAddress "akumar@mikecloud.com" `
-    -UserPrincipalName "akumar@mikecloud.com" `
-    -SamAccountName "akumar" `
-    -AccountPassword $password `
-    -Enabled $true `
-    -Credential $cred `
-    -PasswordNeverExpires $true `
-    -OtherAttributes @{gidNumber='10001'; uidNumber='10004'}
-
-Add-ADGroupMember -Identity "mcloud-users" -Members akumar -credential $cred
-Add-ADGroupMember -Identity "india" -Members akumar -credential $cred
-
-# Grant all users RDP access to this machine
-
-Add-LocalGroupMember -Group "Remote Desktop Users" -Member mcloud-users
-
-# Retrieve the instance ID from AWS EC2 metadata using IMDSv2 (Instance Metadata Service Version 2)
+# Retrieve the instance ID using AWS IMDSv2 for security
 $token = Invoke-RestMethod -Method Put -Uri "http://169.254.169.254/latest/api/token" -Headers @{ "X-aws-ec2-metadata-token-ttl-seconds" = "21600" }
 $instanceId = Invoke-RestMethod -Uri "http://169.254.169.254/latest/meta-data/instance-id" -Headers @{ "X-aws-ec2-metadata-token" = $token }
 
-# Retrieve IAM instance profile association ID for the current EC2 instance
+# Fetch the IAM instance profile association ID for this instance
 $associationId = aws ec2 describe-iam-instance-profile-associations --filters "Name=instance-id,Values=$instanceId" --query "IamInstanceProfileAssociations[0].AssociationId" --output text
 
-# Reassign the instance IAM profile to a less privileged profile
+# Assign a less privileged IAM role to the instance for security
 $profileName = "EC2SSMProfile"
 aws ec2 replace-iam-instance-profile-association --iam-instance-profile Name=$profileName --association-id $associationId
 
-# Shutdown and reboot server to finalize domain join
+# ------------------------------------------------------------
+# Final Reboot to Apply Changes
+# ------------------------------------------------------------
 
+# Reboot the server to finalize the domain join and group policies
 shutdown /r /t 5 /c "Initial EC2 reboot to join domain" /f /d p:4:1
 
 </powershell>
