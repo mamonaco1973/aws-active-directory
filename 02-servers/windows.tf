@@ -43,7 +43,7 @@ resource "aws_instance" "windows_ad_instance" {
   # Assigns an SSH key pair for secure access.
   # Even though this is a Windows instance, the key may be used for encrypted RDP authentication.
   
-  key_name = aws_key_pair.ec2_key_pair.key_name
+  # key_name = aws_key_pair.ec2_key_pair.key_name
 
   # IAM INSTANCE PROFILE
   # Assigns an IAM role with the necessary permissions for accessing AWS resources securely.

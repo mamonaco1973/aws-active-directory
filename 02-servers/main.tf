@@ -82,10 +82,10 @@ data "aws_ami" "windows_ami" {
   }
 }
 
-# Define an EC2 key pair to allow SSH access to instances
-# The public key is read from an existing file
+# # Define an EC2 key pair to allow SSH access to instances
+# # The public key is read from an existing file
 
-resource "aws_key_pair" "ec2_key_pair" {
-  key_name   = "ec2-key-pair"           # Name of the key pair in AWS
-  public_key = file("./key.pem.pub")    # Read the public key from a local file
-}
+# resource "aws_key_pair" "ec2_key_pair" {
+#   key_name   = "ec2-key-pair"           # Name of the key pair in AWS
+#   public_key = file("./key.pem.pub")    # Read the public key from a local file
+# }

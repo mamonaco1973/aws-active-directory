@@ -39,7 +39,7 @@ resource "aws_instance" "linux_ad_instance" {
   # Assigns an SSH key pair for secure access.
   # The key pair is expected to be created elsewhere in the Terraform configuration.
   
-  key_name = aws_key_pair.ec2_key_pair.key_name
+  # key_name = aws_key_pair.ec2_key_pair.key_name
 
   # IAM INSTANCE PROFILE
   # Assigns an IAM role with the necessary permissions for accessing AWS resources securely.

@@ -1,65 +1,72 @@
+# Define a Virtual Private Cloud (VPC)
 resource "aws_vpc" "ad-vpc" {
-  cidr_block           = "10.0.0.0/24"               # CIDR block for the VPC
-  enable_dns_support   = true                        # Enable DNS resolution
-  enable_dns_hostnames = true                        # Allow public DNS hostnames for instances
+  cidr_block           = "10.0.0.0/24"               # Define the IP address range for the VPC (256 addresses)
+  enable_dns_support   = true                        # Enable DNS resolution within the VPC
+  enable_dns_hostnames = true                        # Allow instances to have public DNS hostnames
+  
   tags = {
-    Name = "ad-vpc"                                  # Tag for easy identification
+    Name = "ad-vpc"                                  # Assign a name tag for identification
   }
 }
 
-# Internet Gateway (IGW) for public subnet internet access
+# Create an Internet Gateway (IGW) to allow outbound internet access
 resource "aws_internet_gateway" "ad-igw" {
-  vpc_id = aws_vpc.ad-vpc.id                         # VPC to associate with the IGW
+  vpc_id = aws_vpc.ad-vpc.id                         # Associate the IGW with the VPC
+  
   tags = {
-    Name = "ad-igw"                                  # Tag for easy identification
+    Name = "ad-igw"                                  # Assign a name tag for identification
   }
 }
 
-# Route table for public internet traffic
+# Define a route table for managing routing rules
 resource "aws_route_table" "public" {
-  vpc_id = aws_vpc.ad-vpc.id                         # VPC to associate with the route table
+  vpc_id = aws_vpc.ad-vpc.id                         # Associate the route table with the VPC
+  
   tags = {
-    Name = "public-route-table"                      # Tag for easy identification
+    Name = "public-route-table"                      # Assign a name tag for identification
   }
 }
 
-# Default route for internet-bound traffic in the public route table
+# Create a default route in the public route table to send all traffic to the Internet Gateway
 resource "aws_route" "default_route" {
-  route_table_id         = aws_route_table.public.id # Public route table ID
-  destination_cidr_block = "0.0.0.0/0"               # Route all IPv4 traffic
-  gateway_id             = aws_internet_gateway.ad-igw.id # Internet gateway ID
+  route_table_id         = aws_route_table.public.id # Reference the public route table
+  destination_cidr_block = "0.0.0.0/0"               # Define the default route (all IPs allowed)
+  gateway_id             = aws_internet_gateway.ad-igw.id 
+                                                     # Use the Internet Gateway for outbound traffic
 }
 
-# First public subnet within the VPC
+# Define the first public subnet within the VPC
 resource "aws_subnet" "ad-subnet-1" {
-  vpc_id                  = aws_vpc.ad-vpc.id        # VPC to associate with the subnet
-  cidr_block              = "10.0.0.0/26"            # CIDR block for the subnet
-  map_public_ip_on_launch = true                     # Automatically assign public IPs
-  availability_zone       = "us-east-2a"             # Availability zone
+  vpc_id                  = aws_vpc.ad-vpc.id        # Associate the subnet with the VPC
+  cidr_block              = "10.0.0.0/26"            # Assign a CIDR block (64 IPs)
+  map_public_ip_on_launch = true                     # Automatically assign public IPs to instances
+  availability_zone       = "us-east-2a"             # Specify the availability zone
+  
   tags = {
-    Name = "ad-subnet-1"                             # Tag for easy identification
+    Name = "ad-subnet-1"                             # Assign a name tag for identification
   }
 }
 
-# Second public subnet within the VPC
+# Define the second public subnet within the VPC
 resource "aws_subnet" "ad-subnet-2" {
-  vpc_id                  = aws_vpc.ad-vpc.id        # VPC to associate with the subnet
-  cidr_block              = "10.0.0.64/26"           # CIDR block for the subnet
-  map_public_ip_on_launch = true                     # Automatically assign public IPs
-  availability_zone       = "us-east-2b"             # Availability zone
+  vpc_id                  = aws_vpc.ad-vpc.id        # Associate the subnet with the VPC
+  cidr_block              = "10.0.0.64/26"           # Assign a CIDR block (64 IPs, next available range)
+  map_public_ip_on_launch = true                     # Automatically assign public IPs to instances
+  availability_zone       = "us-east-2b"             # Specify a different availability zone for redundancy
+  
   tags = {
-    Name = "ad-subnet-2"                             # Tag for easy identification
+    Name = "ad-subnet-2"                             # Assign a name tag for identification
   }
 }
 
-# Associate public route table with the first public subnet
+# Associate the public route table with the first public subnet
 resource "aws_route_table_association" "public_rta_1" {
-  subnet_id      = aws_subnet.ad-subnet-1.id         # Subnet ID
-  route_table_id = aws_route_table.public.id         # Public route table ID
+  subnet_id      = aws_subnet.ad-subnet-1.id         # Reference the first public subnet
+  route_table_id = aws_route_table.public.id         # Attach the public route table
 }
 
-# Associate public route table with the second public subnet
+# Associate the public route table with the second public subnet
 resource "aws_route_table_association" "public_rta_2" {
-  subnet_id      = aws_subnet.ad-subnet-2.id         # Subnet ID
-  route_table_id = aws_route_table.public.id         # Public route table ID
+  subnet_id      = aws_subnet.ad-subnet-2.id         # Reference the second public subnet
+  route_table_id = aws_route_table.public.id         # Attach the public route table
 }
