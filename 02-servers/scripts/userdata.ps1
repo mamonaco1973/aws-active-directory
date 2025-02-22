@@ -80,7 +80,7 @@ function Create-ADUserFromSecret {
         -Surname $Surname `
         -DisplayName $DisplayName `
         -EmailAddress $Email `
-        -UserPrincipalName $Email `
+        -UserPrincipalName "${Username}@${domain_fqdn}" `
         -SamAccountName $Username `
         -AccountPassword $password `
         -Enabled $true `
