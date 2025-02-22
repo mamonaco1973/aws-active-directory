@@ -95,6 +95,11 @@ sudo sed -i 's/ldap_id_mapping = True/ldap_id_mapping = False/g' \
 sudo sed -i 's|fallback_homedir = /home/%u@%d|fallback_homedir = /home/%u|' \
     /etc/sssd/sssd.conf
 
+# Stop XAuthority warning 
+
+touch /etc/skel/.Xauthority
+chmod /etc/skel/.Xauthority
+
 # Restart the SSSD and SSH services to apply the changes.
 
 sudo pam-auth-update --enable mkhomedir
