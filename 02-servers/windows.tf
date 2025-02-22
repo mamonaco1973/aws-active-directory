@@ -59,7 +59,7 @@ resource "aws_instance" "windows_ad_instance" {
   # - `computers_ou`: The Organizational Unit where computers are registered in Active Directory.
   
   user_data = templatefile("./scripts/userdata.ps1", { 
-    admin_secret = "admin_ad_credentials"                       #  The administrator credentials secret.
+    admin_secret = "admin_ad_credentials"                       # The administrator credentials secret.
     domain_fqdn  = "mikecloud.com"                              # The domain FQDN for Active Directory integration.
     computers_ou = "OU=Computers,OU=mcloud,DC=mikecloud,DC=com" # The AD OU where computers will be placed.
   })
