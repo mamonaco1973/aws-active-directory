@@ -98,7 +98,7 @@ sudo sed -i 's|fallback_homedir = /home/%u@%d|fallback_homedir = /home/%u|' \
 # Stop XAuthority warning 
 
 touch /etc/skel/.Xauthority
-chmod /etc/skel/.Xauthority
+chmod 600 /etc/skel/.Xauthority
 
 # Restart the SSSD and SSH services to apply the changes.
 
