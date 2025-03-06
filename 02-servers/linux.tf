@@ -56,7 +56,7 @@ resource "aws_instance" "linux_ad_instance" {
 
   user_data = templatefile("./scripts/userdata.sh", { 
     admin_secret = "admin_ad_credentials"                       # The administrator credentials secret
-    domain_fqdn  = "mikecloud.com"                              # The domain FQDN for Active Directory integration.
+    domain_fqdn  = "mcloud.mikecloud.com"                       # The domain FQDN for Active Directory integration.
     computers_ou = "OU=Computers,OU=MCLOUD,DC=mcloud,DC=mikecloud,DC=com" # The AD OU where computers will be placed.
   })
 
