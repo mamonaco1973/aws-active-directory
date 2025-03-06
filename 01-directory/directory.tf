@@ -1,6 +1,6 @@
 # Create an AWS Managed Microsoft Active Directory (AD) instance
 resource "aws_directory_service_directory" "ad_directory" {
-  name        = "mikecloud.com"            # Fully Qualified Domain Name (FQDN) of the AD directory. Change this to your desired AD domain name.
+  name        = "mcloud.mikecloud.com"     # Fully Qualified Domain Name (FQDN) of the AD directory. Change this to your desired AD domain name.
   password    = random_password.admin_password.result  
                                            # Admin password for the directory, sourced from a secure random password resource.
   edition     = "Standard"                 # Choose the AD edition. Options: "Standard" (supports up to 5,000 users) or "Enterprise" (supports up to 100,000 users).
