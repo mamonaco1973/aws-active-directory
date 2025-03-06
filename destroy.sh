@@ -25,4 +25,6 @@ cd 01-directory
 terraform init
 terraform destroy -auto-approve
 
+cd ..
+
 
