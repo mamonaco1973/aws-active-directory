@@ -29,7 +29,7 @@ If this is your first time watching our content, we recommend starting with this
 ## Download this Repository
 
 ```bash
-https://github.com/mamonaco1973/aws-active-directory.git
+git clone https://github.com/mamonaco1973/aws-active-directory.git
 cd aws-active-directory
 ```
 
