@@ -6,8 +6,8 @@ This is Part 1 of the Series: [Deploying Active Directory in the Cloud](TBD)
 
 In this video, we will demonstrate the deployment of **AWS Directory Service**, a fully managed **Active Directory** solution in AWS, while covering the following tasks:  
 
-- **Deploy AWS Directory Service** within an Amazon VPC for seamless directory-aware workloads.  
 - **Configure secure networking** by setting up subnets and security groups to allow domain connectivity.  
+- **Deploy AWS Directory Service** within an Amazon VPC for seamless directory-aware workloads.  
 - **Join both Windows and Linux servers** to the Active Directory domain.  
 - **Configure SSSD** ([System Security Services Daemon](https://sssd.io/)) for Linux authentication with Active Directory.  
 - **Integrate with AWS Secrets Manager** to securely store and retrieve administrator credentials.  
