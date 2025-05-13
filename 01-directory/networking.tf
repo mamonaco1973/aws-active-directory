@@ -40,7 +40,7 @@ resource "aws_subnet" "ad-subnet-1" {
   vpc_id                  = aws_vpc.ad-vpc.id        # Associate the subnet with the VPC
   cidr_block              = "10.0.0.0/26"            # Assign a CIDR block (64 IPs)
   map_public_ip_on_launch = true                     # Automatically assign public IPs to instances
-  availability_zone       = "us-east-2a"             # Specify the availability zone
+  availability_zone_id    = "use1-az6"               # Specify the availability zone
   
   tags = {
     Name = "ad-subnet-1"                             # Assign a name tag for identification
@@ -50,9 +50,9 @@ resource "aws_subnet" "ad-subnet-1" {
 # Define the second public subnet within the VPC
 resource "aws_subnet" "ad-subnet-2" {
   vpc_id                  = aws_vpc.ad-vpc.id        # Associate the subnet with the VPC
-  cidr_block              = "10.0.0.64/26"           # Assign a CIDR block (64 IPs, next available range)
+  cidr_block              = "10.0.0.64/26"           # Assign a CIDR block (64 IPs, next available range) 
   map_public_ip_on_launch = true                     # Automatically assign public IPs to instances
-  availability_zone       = "us-east-2b"             # Specify a different availability zone for redundancy
+  availability_zone_id    = "use1-az4"               # Specify a different availability zone for redundancy
   
   tags = {
     Name = "ad-subnet-2"                             # Assign a name tag for identification

@@ -2,6 +2,8 @@
 
 # Check to make sure we can build
 
+export AWS_DEFAULT_REGION=us-east-1
+
 ./check_env.sh
 if [ $? -ne 0 ]; then
   echo "ERROR: Environment check failed. Exiting."

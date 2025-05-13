@@ -1,7 +1,7 @@
-# Define the AWS provider and set the region to us-east-2 (Ohio)
+# Define the AWS provider and set the region to us-east-1 (Virginia)
 # Modify this if your deployment requires a different AWS region
 provider "aws" {
-  region = "us-east-2"
+  region = "us-east-1"
 }
 
 # Fetch AWS Secrets Manager secrets for different Active Directory users
