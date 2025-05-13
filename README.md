@@ -1,5 +1,7 @@
 # AWS Directory Service
 
+WORKSPACES Addition
+
 This is Part 1 of the Series: [Deploying Active Directory in the Cloud](https://youtu.be/H5lKJPJBL5s)
 
 ## Introduction
