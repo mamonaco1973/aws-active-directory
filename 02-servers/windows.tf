@@ -21,7 +21,7 @@ resource "aws_instance" "windows_ad_instance" {
   # The subnet is dynamically retrieved from a data source (ad_subnet_2).
   # This determines whether the instance is public or private.
   
-  subnet_id = data.aws_subnet.ad_subnet_2.id
+  subnet_id = data.aws_subnet.ad_private_subnet_2.id
 
   # SECURITY GROUPS
   # Applies two security groups:
@@ -32,12 +32,6 @@ resource "aws_instance" "windows_ad_instance" {
     aws_security_group.ad_rdp_sg.id,
     aws_security_group.ad_ssm_sg.id
   ]
-
-  # PUBLIC IP ASSIGNMENT
-  # Ensures the instance gets a public IP upon launch for external access.
-  # WARNING: This makes the instance reachable from the internet if security groups are misconfigured.
-
-  associate_public_ip_address = true
 
   # SSH KEY PAIR (FOR ADMIN ACCESS)
   # Assigns an SSH key pair for secure access.

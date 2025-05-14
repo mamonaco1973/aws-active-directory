@@ -1,6 +1,11 @@
 
 #!/bin/bash
 
+directory_id=$(aws ds describe-directories \
+  --region us-east-1 \
+  --query "DirectoryDescriptions[?Name=='mcloud.mikecloud.com'].DirectoryId" \
+  --output text)
+
 # Phase 1 of Destroy - delete EC2 instances
 
 export AWS_DEFAULT_REGION=us-east-1
@@ -8,7 +13,7 @@ export AWS_DEFAULT_REGION=us-east-1
 cd 02-servers
 
 terraform init
-terraform destroy -auto-approve
+terraform destroy -var="directory_id=$directory_id" -auto-approve
 
 cd ..
 

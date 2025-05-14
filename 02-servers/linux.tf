@@ -18,7 +18,7 @@ resource "aws_instance" "linux_ad_instance" {
   # Specifies the AWS subnet where the instance will be deployed.
   # The subnet is dynamically retrieved from a data source (ad_subnet_1).
   
-  subnet_id = data.aws_subnet.ad_subnet_1.id
+  subnet_id = data.aws_subnet.ad_private_subnet_1.id
 
   # SECURITY GROUPS
   # Applies two security groups:
@@ -29,11 +29,6 @@ resource "aws_instance" "linux_ad_instance" {
     aws_security_group.ad_ssh_sg.id,
     aws_security_group.ad_ssm_sg.id
   ]
-
-  # PUBLIC IP ASSIGNMENT
-  # Ensures the instance gets a public IP upon launch for external access.
-  
-  associate_public_ip_address = true
 
   # SSH KEY PAIR
   # Assigns an SSH key pair for secure access.

@@ -1,72 +1,135 @@
-# Define a Virtual Private Cloud (VPC)
+# VPC Definition
 resource "aws_vpc" "ad-vpc" {
-  cidr_block           = "10.0.0.0/24"               # Define the IP address range for the VPC (256 addresses)
-  enable_dns_support   = true                        # Enable DNS resolution within the VPC
-  enable_dns_hostnames = true                        # Allow instances to have public DNS hostnames
-  
+  cidr_block           = "10.0.0.0/24"
+  enable_dns_support   = true
+  enable_dns_hostnames = true
+
   tags = {
-    Name = "ad-vpc"                                  # Assign a name tag for identification
+    Name = "ad-vpc"
   }
 }
 
-# Create an Internet Gateway (IGW) to allow outbound internet access
+# Internet Gateway
 resource "aws_internet_gateway" "ad-igw" {
-  vpc_id = aws_vpc.ad-vpc.id                         # Associate the IGW with the VPC
-  
+  vpc_id = aws_vpc.ad-vpc.id
+
   tags = {
-    Name = "ad-igw"                                  # Assign a name tag for identification
+    Name = "ad-igw"
   }
 }
 
-# Define a route table for managing routing rules
+resource "aws_eip" "nat_eip" {
+  domain = "vpc"
+
+  tags = {
+    Name = "ad-nat-eip"
+  }
+}
+
+# NAT Gateway in public subnet 1
+resource "aws_nat_gateway" "ad-nat-gw" {
+  allocation_id = aws_eip.nat_eip.id
+  subnet_id     = aws_subnet.ad-subnet-1.id
+
+  tags = {
+    Name = "ad-nat-gateway"
+  }
+}
+
+# Public Route Table
 resource "aws_route_table" "public" {
-  vpc_id = aws_vpc.ad-vpc.id                         # Associate the route table with the VPC
-  
+  vpc_id = aws_vpc.ad-vpc.id
+
   tags = {
-    Name = "public-route-table"                      # Assign a name tag for identification
+    Name = "public-route-table"
   }
 }
 
-# Create a default route in the public route table to send all traffic to the Internet Gateway
-resource "aws_route" "default_route" {
-  route_table_id         = aws_route_table.public.id # Reference the public route table
-  destination_cidr_block = "0.0.0.0/0"               # Define the default route (all IPs allowed)
-  gateway_id             = aws_internet_gateway.ad-igw.id 
-                                                     # Use the Internet Gateway for outbound traffic
+resource "aws_route" "public_default_route" {
+  route_table_id         = aws_route_table.public.id
+  destination_cidr_block = "0.0.0.0/0"
+  gateway_id             = aws_internet_gateway.ad-igw.id
 }
 
-# Define the first public subnet within the VPC
+# Private Route Table
+resource "aws_route_table" "private" {
+  vpc_id = aws_vpc.ad-vpc.id
+
+  tags = {
+    Name = "private-route-table"
+  }
+}
+
+resource "aws_route" "private_default_route" {
+  route_table_id         = aws_route_table.private.id
+  destination_cidr_block = "0.0.0.0/0"
+  nat_gateway_id         = aws_nat_gateway.ad-nat-gw.id
+}
+
+# Public Subnet 1
 resource "aws_subnet" "ad-subnet-1" {
-  vpc_id                  = aws_vpc.ad-vpc.id        # Associate the subnet with the VPC
-  cidr_block              = "10.0.0.0/26"            # Assign a CIDR block (64 IPs)
-  map_public_ip_on_launch = true                     # Automatically assign public IPs to instances
-  availability_zone_id    = "use1-az6"               # Specify the availability zone
-  
+  vpc_id                  = aws_vpc.ad-vpc.id
+  cidr_block              = "10.0.0.0/26"
+  map_public_ip_on_launch = true
+  availability_zone_id    = "use1-az6"
+
   tags = {
-    Name = "ad-subnet-1"                             # Assign a name tag for identification
+    Name = "ad-subnet-1"
   }
 }
 
-# Define the second public subnet within the VPC
+# Public Subnet 2
 resource "aws_subnet" "ad-subnet-2" {
-  vpc_id                  = aws_vpc.ad-vpc.id        # Associate the subnet with the VPC
-  cidr_block              = "10.0.0.64/26"           # Assign a CIDR block (64 IPs, next available range) 
-  map_public_ip_on_launch = true                     # Automatically assign public IPs to instances
-  availability_zone_id    = "use1-az4"               # Specify a different availability zone for redundancy
-  
+  vpc_id                  = aws_vpc.ad-vpc.id
+  cidr_block              = "10.0.0.64/26"
+  map_public_ip_on_launch = true
+  availability_zone_id    = "use1-az4"
+
   tags = {
-    Name = "ad-subnet-2"                             # Assign a name tag for identification
+    Name = "ad-subnet-2"
   }
 }
 
-# Associate the public route table with the first public subnet
-resource "aws_route_table_association" "public_rta_1" {
-  subnet_id      = aws_subnet.ad-subnet-1.id         # Reference the first public subnet
-  route_table_id = aws_route_table.public.id         # Attach the public route table
+# Private Subnet 1
+resource "aws_subnet" "ad-private-subnet-1" {
+  vpc_id               = aws_vpc.ad-vpc.id
+  cidr_block           = "10.0.0.128/26"
+  availability_zone_id = "use1-az6"
+
+  tags = {
+    Name = "ad-private-subnet-1"
+  }
 }
 
-# Associate the public route table with the second public subnet
+# Private Subnet 2
+resource "aws_subnet" "ad-private-subnet-2" {
+  vpc_id               = aws_vpc.ad-vpc.id
+  cidr_block           = "10.0.0.192/26"
+  availability_zone_id = "use1-az4"
+
+  tags = {
+    Name = "ad-private-subnet-2"
+  }
+}
+
+# Route Table Associations - Public Subnets
+resource "aws_route_table_association" "public_rta_1" {
+  subnet_id      = aws_subnet.ad-subnet-1.id
+  route_table_id = aws_route_table.public.id
+}
+
 resource "aws_route_table_association" "public_rta_2" {
-  subnet_id      = aws_subnet.ad-subnet-2.id         # Reference the second public subnet
-  route_table_id = aws_route_table.public.id         # Attach the public route table
+  subnet_id      = aws_subnet.ad-subnet-2.id
+  route_table_id = aws_route_table.public.id
+}
+
+# Route Table Associations - Private Subnets
+resource "aws_route_table_association" "private_rta_1" {
+  subnet_id      = aws_subnet.ad-private-subnet-1.id
+  route_table_id = aws_route_table.private.id
+}
+
+resource "aws_route_table_association" "private_rta_2" {
+  subnet_id      = aws_subnet.ad-private-subnet-2.id
+  route_table_id = aws_route_table.private.id
 }

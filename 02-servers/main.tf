@@ -30,19 +30,19 @@ data "aws_secretsmanager_secret" "akumar_secret" {
 # Retrieve information about a specific AWS subnet using a tag-based filter
 # This subnet will be used for AD services deployment
 
-data "aws_subnet" "ad_subnet_1" {
+data "aws_subnet" "ad_private_subnet_1" {
   filter {
     name   = "tag:Name" # Match based on the 'Name' tag
-    values = ["ad-subnet-1"] # Look for a subnet tagged as "ad-subnet-1"
+    values = ["ad-private-subnet-1"] # Look for a subnet tagged as "ad-private-subnet-1"
   }
 }
 
 # Retrieve information about another AWS subnet for redundancy or HA
 
-data "aws_subnet" "ad_subnet_2" {
+data "aws_subnet" "ad_private_subnet_2" {
   filter {
     name   = "tag:Name"
-    values = ["ad-subnet-2"] # Look for a subnet tagged as "ad-subnet-2"
+    values = ["ad-private-subnet-2"] # Look for a subnet tagged as "ad-private-subnet-2"
   }
 }
 

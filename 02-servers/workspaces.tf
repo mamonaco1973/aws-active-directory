@@ -1,4 +1,14 @@
 
+
+variable "directory_id" {
+  description = "The ID of the AWS Directory Service directory"
+  type        = string
+}
+
+data "aws_directory_service_directory" "mcloud" {
+  directory_id = var.directory_id
+}
+
 resource "aws_iam_role" "workspaces_default" {
   name = "workspaces_DefaultRole"
 
@@ -25,7 +35,7 @@ resource "aws_iam_role_policy_attachment" "workspaces_self_service" {
 }
 
 resource "aws_workspaces_directory" "registered_directory" {
-  directory_id = aws_directory_service_directory.ad_directory.id
+  directory_id = data.aws_directory_service_directory.mcloud.id
 
   self_service_permissions {
     change_compute_type  = true
@@ -55,11 +65,11 @@ resource "aws_workspaces_directory" "registered_directory" {
 }
 
 data "aws_workspaces_bundle" "windows_standard_bundle" {
-  bundle_id = "wsb-5rldsz4nl"
+  bundle_id = "wsb-93xk71ss4"
 }
 
 
-resource "aws_workspaces_workspace" "admin_workspace" {
+resource "aws_workspaces_workspace" "admin_workspace_win" {
   directory_id = aws_workspaces_directory.registered_directory.directory_id
   user_name    = "Admin"
   bundle_id    = data.aws_workspaces_bundle.windows_standard_bundle.id
@@ -80,3 +90,5 @@ resource "aws_workspaces_workspace" "admin_workspace" {
     aws_workspaces_directory.registered_directory
   ]
 }
+
+

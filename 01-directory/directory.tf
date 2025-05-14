@@ -13,8 +13,8 @@ resource "aws_directory_service_directory" "ad_directory" {
   vpc_settings {
     vpc_id     = aws_vpc.ad-vpc.id   # Associates the directory with a specific VPC.
     subnet_ids = [
-      aws_subnet.ad-subnet-1.id,  # ID of the first subnet where the AD instance will be deployed.
-      aws_subnet.ad-subnet-2.id   # ID of the second subnet to ensure high availability.
+      aws_subnet.ad-private-subnet-1.id,  # ID of the first subnet where the AD instance will be deployed.
+      aws_subnet.ad-private-subnet-2.id   # ID of the second subnet to ensure high availability.
     ]
   }
 
