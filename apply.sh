@@ -28,3 +28,10 @@ terraform apply -auto-approve
 
 cd .. 
 
+regcode=$(aws workspaces describe-workspace-directories \
+  --region us-east-1 \
+  --query "Directories[?DirectoryName=='mcloud.mikecloud.com'].RegistrationCode" \
+  --output text)
+
+echo "NOTE: Workspaces Registration Code is '$regcode'"
+
