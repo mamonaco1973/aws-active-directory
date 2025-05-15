@@ -29,7 +29,7 @@ resource "aws_eip" "nat_eip" {
 # NAT Gateway in public subnet 1
 resource "aws_nat_gateway" "ad-nat-gw" {
   allocation_id = aws_eip.nat_eip.id
-  subnet_id     = aws_subnet.ad-subnet-1.id
+  subnet_id     = aws_subnet.nat-subnet.id
 
   tags = {
     Name = "ad-nat-gateway"
@@ -66,28 +66,15 @@ resource "aws_route" "private_default_route" {
   nat_gateway_id         = aws_nat_gateway.ad-nat-gw.id
 }
 
-# Public Subnet 1
-resource "aws_subnet" "ad-subnet-1" {
+# Nat subnet
+resource "aws_subnet" "nat-subnet" {
   vpc_id                  = aws_vpc.ad-vpc.id
   cidr_block              = "10.0.0.0/26"
   map_public_ip_on_launch = false
   availability_zone_id    = "use1-az1"
 
   tags = {
-    Name = "ad-subnet-1"
-  }
-}
-
-# Public Subnet 2
-resource "aws_subnet" "ad-subnet-2" {
-  vpc_id                  = aws_vpc.ad-vpc.id
-  cidr_block              = "10.0.0.64/26"
-  map_public_ip_on_launch = false
-  availability_zone_id    = "use1-az3"
-
-
-  tags = {
-    Name = "ad-subnet-2"
+    Name = "nat-subnet"
   }
 }
 
@@ -115,12 +102,7 @@ resource "aws_subnet" "ad-private-subnet-2" {
 
 # Route Table Associations - Public Subnets
 resource "aws_route_table_association" "public_rta_1" {
-  subnet_id      = aws_subnet.ad-subnet-1.id
-  route_table_id = aws_route_table.public.id
-}
-
-resource "aws_route_table_association" "public_rta_2" {
-  subnet_id      = aws_subnet.ad-subnet-2.id
+  subnet_id      = aws_subnet.nat-subnet.id
   route_table_id = aws_route_table.public.id
 }
 

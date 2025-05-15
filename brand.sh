@@ -40,7 +40,7 @@ cat > "$TMP_JSON" <<EOF
 EOF
 
 # Push branding
-echo "🚀 Uploading branding..."
+echo "NOTE: Uploading branding..."
 aws workspaces import-client-branding \
   --cli-input-json file://"$TMP_JSON" \
   --region "$REGION"
@@ -49,7 +49,7 @@ STATUS=$?
 rm -f "$TMP_JSON"
 
 if [[ $STATUS -eq 0 ]]; then
-  echo "✅ Branding applied successfully."
+  echo "NOTE: Branding applied successfully."
 else
-  echo "❌ Failed to apply branding."
+  echo "ERROR: Failed to apply branding."
 fi

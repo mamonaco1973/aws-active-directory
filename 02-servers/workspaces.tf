@@ -80,7 +80,7 @@ resource "aws_workspaces_workspace" "admin_workspace_win" {
   bundle_id    = data.aws_workspaces_bundle.windows_standard_bundle.id
 
   workspace_properties {
-    compute_type_name                         = "VALUE"
+    compute_type_name                         = "STANDARD"
     root_volume_size_gib                      = 80
     user_volume_size_gib                      = 50
     running_mode                              = "AUTO_STOP"

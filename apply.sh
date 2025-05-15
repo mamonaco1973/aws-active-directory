@@ -38,5 +38,23 @@ regcode=$(aws workspaces describe-workspace-directories \
   --query "Directories[?DirectoryName=='mcloud.mikecloud.com'].RegistrationCode" \
   --output text)
 
-# echo "NOTE: Workspaces Registration Code is '$regcode'"
+echo "NOTE: Branding the Workspaces."
+./brand.sh
+
+echo "NOTE: Workspaces Registration Code is '$regcode'"
+echo "NOTE: Workspace web client url is 'https://us-east-1.webclient.amazonworkspaces.com/login'"
+
+windows_dns_name=$(aws ec2 describe-instances \
+  --filters "Name=tag:Name,Values=windows-ad-instance" \
+  --query "Reservations[*].Instances[*].PrivateDnsName" \
+  --output text)
+echo "NOTE: Private DNS name for Windows Server is '$windows_dns_name'"
+
+linux_dns_name=$(aws ec2 describe-instances \
+  --filters "Name=tag:Name,Values=linux-ad-instance" \
+  --query "Reservations[*].Instances[*].PrivateDnsName" \
+  --output text)
+
+echo "NOTE: Private DNS name for Linux Server is '$linux_dns_name'"
+
 
