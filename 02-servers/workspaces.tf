@@ -69,13 +69,18 @@ data "aws_workspaces_bundle" "windows_standard_bundle" {
 }
 
 
+data "aws_workspaces_bundle" "redhat_standard_bundle" {
+  bundle_id = "wsb-8wthbqzhx"
+}
+
+
 resource "aws_workspaces_workspace" "admin_workspace_win" {
   directory_id = aws_workspaces_directory.registered_directory.directory_id
   user_name    = "Admin"
   bundle_id    = data.aws_workspaces_bundle.windows_standard_bundle.id
 
   workspace_properties {
-    compute_type_name                         = "STANDARD"
+    compute_type_name                         = "VALUE"
     root_volume_size_gib                      = 80
     user_volume_size_gib                      = 50
     running_mode                              = "AUTO_STOP"
@@ -91,4 +96,25 @@ resource "aws_workspaces_workspace" "admin_workspace_win" {
   ]
 }
 
+#resource "aws_workspaces_workspace" "rpatel_workspace_redhat" {
+#  directory_id = aws_workspaces_directory.registered_directory.directory_id
+#  user_name    = "rpatel"
+#  bundle_id    = data.aws_workspaces_bundle.redhat_standard_bundle.id
+
+#  workspace_properties {
+#    compute_type_name                         = "STANDARD"
+#    root_volume_size_gib                      = 80
+#    user_volume_size_gib                      = 50
+#    running_mode                              = "AUTO_STOP"
+#    running_mode_auto_stop_timeout_in_minutes = 60
+#  }
+#
+#  tags = {
+#    Name = "rpatel workspace"
+#  }
+
+#  depends_on = [
+#    aws_workspaces_workspace.admin_workspace_win
+#  ]
+#}
 
