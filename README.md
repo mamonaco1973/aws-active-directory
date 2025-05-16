@@ -1,6 +1,7 @@
 # AWS WorkSpaces
 
 This is a follow-up to the [AWS Directory Service](https://youtu.be/1lnSxfFmGPY) video and [GitHub Project](https://github.com/mamonaco1973/aws-active-directory/blob/main/README.md).
+The project materials for AWS workspaces shows up in the `workspaces` branch in the original project.
 
 ## Introduction
 
@@ -16,10 +17,10 @@ In the original [**AWS Directory Service** project](https://github.com/mamonaco1
 This project builds upon the original by making the following changes:
 
 - EC2 instances will be moved to **private subnets**, removing public exposure.
-- The deployment will be moved to the **`us-east-1`** region, as **WorkSpaces is not supported** in us-east-2.
+- The deployment will be moved to the **`us-east-1`** region, as **WorkSpaces are not supported** in us-east-2.
 - The `mcloud.mikecloud.com` domain will be **registered for AWS WorkSpaces**.
 - A WorkSpace will be provisioned for the **`Admin` Active Directory user**.
-- The WorkSpace will be used as a **"poor man's VPN"** to access the private EC2 instances.
+- The WorkSpace acts as a secure access point to reach private EC2 instances within the VPC. In this setup, the WorkSpace effectively functions as a jump box, enabling access to internal resources without exposing them to the public internet.
 
 ![AWS diagram](aws-directory.png)
 
@@ -60,7 +61,7 @@ git switch workspaces
 Run [check_env](check_env.sh) then run [apply](apply.sh).
 
 ```bash
-develop-vm:~/aws-active-directory$ ./apply.sh
+develop-vm:~/aws-workspace$ ./apply.sh
 NOTE: Validating that required commands are found in your PATH.
 NOTE: aws is found in the current PATH.
 NOTE: terraform is found in the current PATH.
