@@ -63,7 +63,7 @@ cat > "$TMP_JSON" <<EOF
       "en_US": "$LOGIN_MESSAGE"
     }
   },
-  "DeviceTypeMacOs": {
+  "DeviceTypeOsx": {
     "Logo": "$BASE64_LOGO",
     "LoginMessage": {
       "en_US": "$LOGIN_MESSAGE"
