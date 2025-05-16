@@ -1,60 +1,85 @@
 #!/bin/bash
 
-# Check to make sure we can build
+# -------------------------
+# Step 0: Set AWS region
+# -------------------------
 
-export AWS_DEFAULT_REGION=us-east-1
+export AWS_DEFAULT_REGION=us-east-1  # Required so AWS CLI/Terraform know where to operate
 
-./check_env.sh
+# --------------------------------------
+# Step 1: Run preflight environment check
+# --------------------------------------
+./check_env.sh  # This should validate CLI setup, credentials, and required binaries
 if [ $? -ne 0 ]; then
   echo "ERROR: Environment check failed. Exiting."
-  exit 1
+  exit 1  # 🚨 Abort if check_env.sh fails — nothing should run without a valid env
 fi
+set -e
 
-# Build Phase 1 - Create the AD instance
+# -------------------------------------
+# Step 2: Build Phase 1 - AD Deployment
+# -------------------------------------
+cd 01-directory  # Enter the Terraform directory for AD setup
 
-cd 01-directory
+terraform init  # Initialize Terraform — installs providers, sets up backend
+terraform apply -auto-approve  # 🚀 Launch AD resources (Managed Microsoft AD or Simple AD)
 
-terraform init
-terraform apply -auto-approve
+cd ..  # Go back to root directory
 
-cd ..
-
+# -------------------------------------------------
+# Step 3: Get the Directory ID for mcloud.mikecloud.com
+# -------------------------------------------------
 directory_id=$(aws ds describe-directories \
   --region us-east-1 \
   --query "DirectoryDescriptions[?Name=='mcloud.mikecloud.com'].DirectoryId" \
-  --output text)
+  --output text)  # 🔍 Extract the directory_id dynamically for use in next Terraform phase
 
-# Build Phase 2 - Create EC2 Instances
+# ------------------------------------------
+# Step 4: Build Phase 2 - EC2 Server Launch
+# ------------------------------------------
+cd 02-servers  # Enter the Terraform folder for EC2 instances
 
-cd 02-servers
+terraform init  # Re-initialize in this directory
+terraform apply -var="directory_id=$directory_id"  -auto-approve  # ⚙️ Pass directory ID into the EC2 provisioning module
 
-terraform init
-terraform apply -var="directory_id=$directory_id"  -auto-approve
+cd ..  # Return to root
 
-cd .. 
-
+# -------------------------------------------------
+# Step 5: Retrieve WorkSpaces Registration Code
+# -------------------------------------------------
 regcode=$(aws workspaces describe-workspace-directories \
   --region us-east-1 \
   --query "Directories[?DirectoryName=='mcloud.mikecloud.com'].RegistrationCode" \
-  --output text)
+  --output text)  # 🔐 This code is needed to register WorkSpaces clients
 
+# -------------------------
+# Step 6: Run Branding Script
+# -------------------------
 echo "NOTE: Branding the Workspaces."
-./brand.sh
+./brand.sh  # 🖼️ Apply custom branding (logos, etc.) to WorkSpaces client portals
 
+# --------------------------------------------
+# Step 7: Output Registration Code and URL
+# --------------------------------------------
 echo "NOTE: Workspaces Registration Code is '$regcode'"
 echo "NOTE: Workspace web client url is 'https://us-east-1.webclient.amazonworkspaces.com/login'"
 
+# ------------------------------------------------------------
+# Step 8: Fetch EC2 Private DNS Name for Windows AD Instance
+# ------------------------------------------------------------
 windows_dns_name=$(aws ec2 describe-instances \
   --filters "Name=tag:Name,Values=windows-ad-instance" \
   --query "Reservations[*].Instances[*].PrivateDnsName" \
-  --output text)
+  --output text)  # 🛰️ Pull internal DNS name — useful for joining domain, troubleshooting
+
 echo "NOTE: Private DNS name for Windows Server is '$windows_dns_name'"
 
+# ----------------------------------------------------------
+# Step 9: Fetch EC2 Private DNS Name for Linux AD Instance
+# ----------------------------------------------------------
 linux_dns_name=$(aws ec2 describe-instances \
   --filters "Name=tag:Name,Values=linux-ad-instance" \
   --query "Reservations[*].Instances[*].PrivateDnsName" \
-  --output text)
+  --output text)  # 🛰️ Same as above but for Linux node
 
 echo "NOTE: Private DNS name for Linux Server is '$linux_dns_name'"
-
-
