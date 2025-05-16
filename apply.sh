@@ -2,6 +2,8 @@
 
 # Check to make sure we can build
 
+export AWS_DEFAULT_REGION=us-east-2  # Required so AWS CLI/Terraform know where to operate
+
 ./check_env.sh
 if [ $? -ne 0 ]; then
   echo "ERROR: Environment check failed. Exiting."
