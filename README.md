@@ -1,24 +1,42 @@
-# AWS Directory Service
+# AWS WorkSpaces
 
-WORKSPACES Addition
-
-This is Part 1 of the Series: [Deploying Active Directory in the Cloud](https://youtu.be/H5lKJPJBL5s)
+This is a follow-up to the [AWS Directory Service](https://youtu.be/1lnSxfFmGPY) video and [GitHub Project](https://github.com/mamonaco1973/aws-active-directory/blob/main/README.md).
 
 ## Introduction
 
-In this video, we will demonstrate the deployment of **AWS Directory Service**, a fully managed **Active Directory** solution in AWS, while covering the following tasks:  
+In the original [**AWS Directory Service** project](https://github.com/mamonaco1973/aws-active-directory), we deployed:
 
-- **Configure secure networking** by setting up subnets and security groups to allow domain connectivity.  
-- **Deploy AWS Directory Service** within an Amazon VPC for seamless directory-aware workloads.  
-- **Join both Windows and Linux servers** to the Active Directory domain.  
-- **Configure SSSD** ([System Security Services Daemon](https://sssd.io/)) for Linux authentication with Active Directory.  
-- **Integrate with AWS Secrets Manager** to securely store and retrieve administrator credentials.  
-- **Manage directory objects and policies**, including users, groups, and Organizational Units (OUs).   
-- **Clean up resources** by decommissioning all infrastructure provisioned during the process.  
+- An Active Directory domain: `mcloud.mikecloud.com` in us-east-2
+- Several users and groups in Active Directory
+- A public Linux EC2 instance joined to the domain (SSH enabled)
+- A public Windows EC2 instance joined to the domain (RDP enabled)
 
-This tutorial will help you understand **AWS Directory Service** and how to use it for **identity management in AWS environments**.
+## What This Project Adds
+
+This project builds upon the original by making the following changes:
+
+- EC2 instances will be moved to **private subnets**, removing public exposure.
+- The deployment will be moved to the **`us-east-1`** region, as **WorkSpaces is not supported** in us-east-2.
+- The `mcloud.mikecloud.com` domain will be **registered for AWS WorkSpaces**.
+- A WorkSpace will be provisioned for the **`Admin` Active Directory user**.
+- The WorkSpace will be used as a **"poor man's VPN"** to access the private EC2 instances.
 
 ![AWS diagram](aws-directory.png)
+
+## Overview of Desktop as a Service
+
+**Desktop as a Service (DaaS)** is a cloud computing solution that delivers virtual desktops to end users over the internet. Instead of managing physical desktops or complex VDI infrastructure, organizations can quickly provision secure, scalable desktop environments from the cloud.
+
+With DaaS, users can access their desktop from anywhere using a browser or native client, while IT benefits from simplified management, centralized security, and predictable billing.
+
+**AWS WorkSpaces** is Amazon’s DaaS offering, enabling deployment of Windows or Linux desktops that integrate with Active Directory. It supports features like auto-stop to reduce costs, encrypted storage, and domain joins for enterprise control.
+
+Typical use cases include:
+
+- Secure remote access for employees or contractors  
+- Temporary desktop environments for training or testing  
+- Scalable desktops for seasonal or project-based workloads  
+- Minimizing IT overhead for desktop management and patching
 
 ## Prerequisites
 
@@ -31,8 +49,9 @@ If this is your first time watching our content, we recommend starting with this
 ## Download this Repository
 
 ```bash
-git clone https://github.com/mamonaco1973/aws-active-directory.git
-cd aws-active-directory
+git clone https://github.com/mamonaco1973/aws-active-directory.git aws-workspaces
+cd aws-workspaces
+git switch workspaces
 ```
 
 ## Build the Code
@@ -69,86 +88,41 @@ commands will detect it and remind you to do so if necessary.
 
 ### Build Process Overview  
 
-The build process consists of two phases:  
+The build process consists of two phases:
 
-1. **Phase 1:** Use Terraform to provision the required networking and deploy the AWS Directory Service instance. This phase takes approximately **30-60 minutes** to complete.  
-2. **Phase 2:** Once the directory service is provisioned, deploy a Linux and a Windows EC2 instance. Their respective **user data scripts** will automatically join them to the domain during initialization.  
+1. **Phase 1:**  
+   Use Terraform to provision the required networking and deploy the AWS Directory Service instance. This phase typically takes **30–60 minutes** to complete.
 
-## Tour of Build Output in the AWS Console
+2. **Phase 2:**  
+   After the directory service is provisioned, Terraform deploys both a Linux and a Windows EC2 instance, along with the `Admin` WorkSpace. Each EC2 instance runs a **user data script** during initialization to automatically join the domain.
 
-- **Networking**
-- **The Active Directory Instance**
-- **Secrets Manager**
-- **The Windows EC2 Instance**
-- **The Linux EC2 Instance**
+## Review Build Results
 
-![AWS Directory](console1.png)
+This section shows the key components of the environment after deployment:
 
-![AWS EC2 Instance](console2.png)
+- **The Active Directory Instance**  
 
-### Retrieving Initial Admin Credentials
+  The AWS Directory Service provides the core identity infrastructure, allowing EC2 instances and WorkSpaces to join the domain.  
 
-Once your **AWS Directory** instance is provisioned, AWS automatically creates the **`Admin`** user account within the directory. This account has **Domain Admin** privileges, allowing you to perform administrative tasks like creating Organizational Units (OUs), managing Group Policy, and adding users. You can set the Admin password directly in the console and directly in the terraform. In this project we store the **`Admin`** credentials in the `admin_ad_credentials` secret.
+  ![AWS Directory](console1.png)
 
-### Users and Groups
+- **The EC2 Instance2**  
 
-As part of this project, when the Windows instance boots and successfully joins Active Directory, a set of **users** and **groups** are automatically created through a scripted process. These resources are intended for **testing and demonstration purposes**, showcasing how to automate user and group provisioning in a cloud-integrated Active Directory environment.
+EC2 instances are domain-joined during initialization and can be accessed using RDP and SSH via the private network.  
+  
+  ![AWS EC2 Instance](console2.png)
 
-#### Groups Created
+- **The Workspace Client**  
 
-| Group Name    | Group Category | Group Scope | gidNumber |
-|----------------|----------------|----------------|------------|
-| mcloud-users   | Security       | Universal     | 10001 |
-| india          | Security       | Universal     | 10002 |
-| us             | Security       | Universal     | 10003 |
-| linux-admins   | Security       | Universal     | 10004 |
+  The WorkSpaces client application is used to securely access the virtual desktop provisioned for the `Admin` user.  Note the custom branding logo that we uploaded during the build.
+  
+  ![Workspace Client](workspaces1.png)
 
-#### Users Created and Group Memberships
+- **The Admin Workspace**  
 
-| Username | Full Name   | uidNumber | gidNumber | Groups Joined                    |
-|---------|------------|-----------|-----------|----------------------|
-| jsmith  | John Smith  | 10001 | 10001 | mcloud-users, us, linux-admins |
-| edavis  | Emily Davis | 10002 | 10001 | mcloud-users, us |
-| rpatel  | Raj Patel   | 10003 | 10001 | mcloud-users, india, linux-admins |
-| akumar  | Amit Kumar  | 10004 | 10001 | mcloud-users, india |
-
----
-
-
-#### Understanding `uidNumber` and `gidNumber` for Linux Integration
-
-The **`uidNumber`** (User ID) and **`gidNumber`** (Group ID) attributes are critical when integrating **Active Directory** with **Linux systems**, particularly in environments where **SSSD** ([System Security Services Daemon](https://sssd.io/)) or similar services are used for identity management. These attributes allow Linux hosts to recognize and map Active Directory users and groups into the **POSIX** (Portable Operating System Interface) user and group model.
-
-### Log into Windows Instance  
-
-When the Windows instance boots, the [userdata script](02-servers/scripts/userdata.ps1) executes the following tasks:  
-
-- Install Active Directory Administrative Tools  
-- AWS CLI Installation  
-- Join EC2 Instance to Active Directory  
-- Create Active Directory Groups  
-- Create Active Directory Users and Assign to Groups  
-- Grant RDP Access  
-- Final System Reboot  
-
-Administrator credentials are stored in the `admin_ad_credentials` secret.
-
-![Windows EC2 Instance](windows.png)
-
-### Log into Linux Instance  
-
-When the Linux instance boots, the [userdata script](02-servers/scripts/userdata.sh) runs the following tasks:  
-
-- Update OS and install required packages  
-- Install AWS CLI  
-- Join the Active Directory domain with SSSD  
-- Enable password authentication for AD users  
-- Configure SSSD for AD integration  
-- Grant sudo privileges to the `linux-admins` group  
-
-Linux user credentials are stored as secrets.
-
-![Linux EC2 Instance](linux.png)
+  This cloud-based Windows desktop is fully domain-joined and acts as a secure bastion host for managing the private environment.  
+  
+  ![Workspace Desktop](workspaces2.png)
 
 ## Run the "destroy" script when you are done
 
