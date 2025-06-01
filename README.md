@@ -17,7 +17,7 @@ In the original [**AWS Directory Service** project](https://github.com/mamonaco1
 This project builds upon the original by making the following changes:
 
 - EC2 instances will be moved to **private subnets**, removing public exposure.
-- The deployment will be moved to the **`us-east-1`** region, as **WorkSpaces are not supported** in us-east-2.
+- The deployment will be moved to the **`us-east-1`** region, as **WorkSpaces are not supported** in us-east-2. See [Availablity Zones for Workspaces](https://docs.aws.amazon.com/workspaces/latest/adminguide/azs-workspaces.html#:~:text=Amazon%20WorkSpaces%20is%20only%20available,usgw1%2Daz2%20%2C%20usgw1%2Daz3)
 - The `mcloud.mikecloud.com` domain will be **registered for AWS WorkSpaces**.
 - A WorkSpace will be provisioned for the **`Admin` Active Directory user**.
 - The WorkSpace acts as a secure access point to reach private EC2 instances within the VPC. In this setup, the WorkSpace effectively functions as a jump box, enabling access to internal resources without exposing them to the public internet.
