@@ -77,7 +77,7 @@ EOF
 echo "NOTE: Uploading branding to all client types..."
 aws workspaces import-client-branding \
   --cli-input-json file://"$TMP_JSON" \
-  --region "$REGION"
+  --region "$REGION" > /dev/null 2> /dev/null
 
 # 🧹 Clean up the temp file no matter what happens.
 STATUS=$?

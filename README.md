@@ -126,6 +126,21 @@ EC2 instances are domain-joined during initialization and can be accessed using 
   
   ![Workspace Desktop](workspaces2.png)
 
+
+## Steps to Log into Your AWS WorkSpace
+
+1. **Launch the WorkSpaces Client**  
+   Open the [AWS WorkSpaces Client](https://clients.amazonworkspaces.com/) on your local machine (Windows, macOS, or browser-based).
+
+2. **Retrieve the "Admin" Credentials from AWS Secrets Manager**  
+   Use **AWS Secrets Manager** to retrieve the **"Admin"** username and password used to authenticate into Active Directory.
+
+3. **Log In with Retrieved Credentials**  
+   Enter the **registration code** associated with your WorkSpace, then sign in using the retrieved "Admin" credentials.
+
+4. **Launch the Windows Desktop**  
+   Click **Connect** for the assigned Windows WorkSpace. The virtual desktop will launch in a new window.
+
 ## Run the "destroy" script when you are done
 
 ```bash
