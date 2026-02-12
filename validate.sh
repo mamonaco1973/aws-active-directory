@@ -71,3 +71,5 @@ if [ -n "${linux_dns}" ] && [ "${linux_dns}" != "None" ]; then
 else
   echo "WARN: linux-ad-instance not found or no public DNS"
 fi
+
+echo ""
