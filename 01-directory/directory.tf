@@ -58,7 +58,7 @@ resource "aws_directory_service_directory" "ad_directory" {
 # ------------------------------------------------------------------------------
 
 resource "aws_vpc_dhcp_options" "ad_dhcp_options" {
-  domain_name = var.ad_domain_name
+  domain_name         = var.ad_domain_name
   domain_name_servers = aws_directory_service_directory.ad_directory.dns_ip_addresses
   tags = {
     Name = "${lower(var.netbios)}-dhcp-options"
