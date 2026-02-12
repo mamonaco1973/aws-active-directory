@@ -7,57 +7,75 @@ New-Item -Path $Log -ItemType File -Force | Out-Null
 Start-Transcript -Path $Log -Append -Force
 
 try {
-    Write-Output "Starting PowerShell user-data at $(Get-Date -Format o)"
+    Write-Host "Starting PowerShell user-data at $(Get-Date -Format o)"
 
-    # Install AD management features
+    Write-Host "Installing AD management Windows features"
     Install-WindowsFeature -Name `
         GPMC,RSAT-AD-PowerShell,RSAT-AD-AdminCenter,RSAT-ADDS-Tools,RSAT-DNS-Server
 
-    # Install AWS CLI v2
-    Invoke-WebRequest https://awscli.amazonaws.com/AWSCLIV2.msi `
-        -OutFile C:\Users\Administrator\AWSCLIV2.msi
+    Write-Host "Downloading AWS CLI v2 MSI"
+    $msi = 'C:\Users\Administrator\AWSCLIV2.msi'
+    if (-not (Test-Path $msi)) {
+        Invoke-WebRequest https://awscli.amazonaws.com/AWSCLIV2.msi -OutFile $msi
+    }
 
-    Start-Process "msiexec" `
-        -ArgumentList "/i C:\Users\Administrator\AWSCLIV2.msi /qn" `
-        -Wait -NoNewWindow
+    Write-Host "Installing AWS CLI v2 MSI"
+    Start-Process "msiexec" -ArgumentList "/i $msi /qn" -Wait -NoNewWindow
 
     $env:Path += ";C:\Program Files\Amazon\AWSCLIV2"
+    Write-Host "AWS CLI path: $((Get-Command aws -ErrorAction SilentlyContinue).Source)"
 
-    # Retrieve domain credentials
+    Write-Host "Retrieving domain join credentials from Secrets Manager"
     $secretValue  = aws secretsmanager get-secret-value `
         --secret-id ${admin_secret} `
         --query SecretString `
         --output text
 
     $secretObject = $secretValue | ConvertFrom-Json
-    $password     = $secretObject.password | ConvertTo-SecureString -AsPlainText -Force
-    $cred         = New-Object System.Management.Automation.PSCredential `
-        ($secretObject.username, $password)
+    $securePassword = $secretObject.password | ConvertTo-SecureString -AsPlainText -Force
+    $cred = New-Object System.Management.Automation.PSCredential `
+        ($secretObject.username, $securePassword)
 
-    # Join domain
-    Add-Computer -DomainName "${domain_fqdn}" `
-        -Credential $cred `
-        -Force `
-        -OUPath "${computers_ou}"
+    # Domain join (skip if already joined)
+    $cs = Get-CimInstance Win32_ComputerSystem
+    if ($cs.PartOfDomain -and ($cs.Domain -ieq "${domain_fqdn}")) {
+        Write-Host "Already joined to ${domain_fqdn}"
+    } else {
+        Write-Host "Joining AD domain ${domain_fqdn}"
+        Add-Computer -DomainName "${domain_fqdn}" -Credential $cred -Force `
+            -OUPath "${computers_ou}"
+        Write-Host "Domain join command completed"
+    }
 
-    # Create AD groups
-    New-ADGroup -Name "mcloud-users" -GroupCategory Security -GroupScope Universal `
-        -Credential $cred -OtherAttributes @{gidNumber='10001'}
+    Write-Host "Loading ActiveDirectory module"
+    Import-Module ActiveDirectory
 
-    New-ADGroup -Name "india" -GroupCategory Security -GroupScope Universal `
-        -Credential $cred -OtherAttributes @{gidNumber='10002'}
+    function New-ADGroupIfMissing {
+        param(
+            [string]$Name,
+            [string]$GidNumber
+        )
 
-    New-ADGroup -Name "us" -GroupCategory Security -GroupScope Universal `
-        -Credential $cred -OtherAttributes @{gidNumber='10003'}
+        if (Get-ADGroup -Identity $Name -ErrorAction SilentlyContinue) {
+            Write-Host "Group exists: $Name"
+            return
+        }
 
-    New-ADGroup -Name "linux-admins" -GroupCategory Security -GroupScope Universal `
-        -Credential $cred -OtherAttributes @{gidNumber='10004'}
+        Write-Host "Creating group: $Name"
+        New-ADGroup -Name $Name -GroupCategory Security -GroupScope Universal `
+            -Credential $cred -OtherAttributes @{gidNumber=$GidNumber}
+    }
 
-    # UID counter
+    Write-Host "Creating AD groups (idempotent)"
+    New-ADGroupIfMissing -Name "mcloud-users" -GidNumber "10001"
+    New-ADGroupIfMissing -Name "india"       -GidNumber "10002"
+    New-ADGroupIfMissing -Name "us"          -GidNumber "10003"
+    New-ADGroupIfMissing -Name "linux-admins" -GidNumber "10004"
+
     $global:uidCounter = 10000
 
     function New-ADUserFromSecret {
-        param (
+        param(
             [string]$SecretId,
             [string]$GivenName,
             [string]$Surname,
@@ -67,37 +85,65 @@ try {
             [array]$Groups
         )
 
-        $global:uidCounter++
-        $uidNumber = $global:uidCounter
+        $user = Get-ADUser -Identity $Username -ErrorAction SilentlyContinue
 
-        $secretValue  = aws secretsmanager get-secret-value `
-            --secret-id $SecretId `
-            --query SecretString `
-            --output text
+        if (-not $user) {
+            $global:uidCounter++
+            $uidNumber = $global:uidCounter
 
-        $secretObject = $secretValue | ConvertFrom-Json
-        $password     = $secretObject.password | ConvertTo-SecureString -AsPlainText -Force
+            Write-Host "User $Username : retrieving secret $SecretId"
+            $sv = aws secretsmanager get-secret-value `
+                --secret-id $SecretId `
+                --query SecretString `
+                --output text
 
-        New-ADUser `
-            -Name $Username `
-            -GivenName $GivenName `
-            -Surname $Surname `
-            -DisplayName $DisplayName `
-            -EmailAddress $Email `
-            -UserPrincipalName "$Username@${domain_fqdn}" `
-            -SamAccountName $Username `
-            -AccountPassword $password `
-            -Enabled $true `
-            -Credential $cred `
-            -PasswordNeverExpires $true `
-            -OtherAttributes @{gidNumber='10001'; uidNumber=$uidNumber}
+            $so = $sv | ConvertFrom-Json
+            $userSecurePassword = $so.password | ConvertTo-SecureString `
+                -AsPlainText -Force
+
+            Write-Host "User $Username : creating AD user"
+            New-ADUser `
+                -Name $Username `
+                -GivenName $GivenName `
+                -Surname $Surname `
+                -DisplayName $DisplayName `
+                -EmailAddress $Email `
+                -UserPrincipalName "$Username@${domain_fqdn}" `
+                -SamAccountName $Username `
+                -AccountPassword $userSecurePassword `
+                -Enabled $true `
+                -Credential $cred `
+                -PasswordNeverExpires $true `
+                -OtherAttributes @{gidNumber='10001'; uidNumber=$uidNumber}
+
+            $user = Get-ADUser -Identity $Username
+        } else {
+            Write-Host "User exists: $Username"
+        }
+
+        $currentGroups = @()
+        try {
+            $currentGroups =
+                (Get-ADPrincipalGroupMembership -Identity $Username `
+                 | Select-Object -ExpandProperty Name)
+        } catch {
+            $currentGroups = @()
+        }
 
         foreach ($group in $Groups) {
-            Add-ADGroupMember -Identity $group -Members $Username -Credential $cred
+            if ($currentGroups -contains $group) {
+                Write-Host "User $Username already in group $group"
+            } else {
+                Write-Host "Adding $Username to group $group"
+                Add-ADGroupMember -Identity $group -Members $Username `
+                    -Credential $cred
+            }
         }
+
+        Write-Host "User $Username : complete"
     }
 
-    # Create users
+    Write-Host "Creating AD users (idempotent)"
     New-ADUserFromSecret "jsmith_ad_credentials_ds" "John" "Smith" "John Smith" `
         "jsmith@mikecloud.com" "jsmith" @("mcloud-users","us","linux-admins")
 
@@ -110,24 +156,38 @@ try {
     New-ADUserFromSecret "akumar_ad_credentials_ds" "Amit" "Kumar" "Amit Kumar" `
         "akumar@mikecloud.com" "akumar" @("mcloud-users","india")
 
-    # RDP group assignment (with retry)
+    Write-Host "Granting RDP access to domain group (idempotent)"
     $domainGroup = "MCLOUD\mcloud-users"
-    $maxRetries  = 10
-    $retryDelay  = 30
+    $localGroup  = "Remote Desktop Users"
 
-    for ($i = 1; $i -le $maxRetries; $i++) {
-        try {
-            Add-LocalGroupMember -Group "Remote Desktop Users" `
-                -Member $domainGroup -ErrorAction Stop
-            break
-        } catch {
-            Start-Sleep -Seconds $retryDelay
+    $already = Get-LocalGroupMember -Group $localGroup -ErrorAction SilentlyContinue `
+        | Where-Object { $_.Name -ieq $domainGroup }
+
+    if ($already) {
+        Write-Host "$domainGroup already in $localGroup"
+    } else {
+        $maxRetries = 10
+        $retryDelay = 30
+
+        for ($i = 1; $i -le $maxRetries; $i++) {
+            try {
+                Write-Host "Attempt $i : Add-LocalGroupMember $domainGroup"
+                Add-LocalGroupMember -Group $localGroup -Member $domainGroup `
+                    -ErrorAction Stop
+                Write-Host "SUCCESS: Added $domainGroup to $localGroup"
+                break
+            } catch {
+                Write-Host "WARN: Attempt $i failed - waiting $retryDelay seconds"
+                Start-Sleep -Seconds $retryDelay
+            }
         }
     }
 
+    Write-Host "Rebooting to finalize domain join and apply group policy"
     shutdown /r /t 5 /c "Initial EC2 reboot to join domain" /f /d p:4:1
 }
 finally {
+    Write-Host "User-data finishing at $(Get-Date -Format o)"
     Stop-Transcript | Out-Null
 }
 </powershell>
