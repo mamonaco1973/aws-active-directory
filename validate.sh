@@ -41,7 +41,8 @@ print_directory_info() {
     dns="N/A"
   fi
 
-  echo "NOTE: Directory:"
+  echo "NOTE: Directory INFO:"
+  echo ""
   echo "  Name : ${DIRECTORY_NAME}"
   echo "  ID   : ${dir_id}"
   echo "  Stage: ${stage}"
