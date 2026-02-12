@@ -1,16 +1,37 @@
 #!/bin/bash
+# ==============================================================================
+# File: apply.sh
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Deploy the full stack in two phases:
+#     1) AWS Managed Microsoft AD (Directory Service)
+#     2) EC2 servers that depend on the directory
+#
+# Notes:
+#   - Script fails immediately on any error.
+#   - AWS_DEFAULT_REGION must be set for AWS CLI and Terraform.
+#   - Execution order matters (servers depend on directory).
+# ==============================================================================
 
-# Check to make sure we can build
+set -euo pipefail
 
-export AWS_DEFAULT_REGION=us-east-2  # Required so AWS CLI/Terraform know where to operate
+# ------------------------------------------------------------------------------
+# Global configuration
+# ------------------------------------------------------------------------------
+
+export AWS_DEFAULT_REGION="us-east-2"
+
+# ------------------------------------------------------------------------------
+# Pre-flight environment validation
+# ------------------------------------------------------------------------------
 
 ./check_env.sh
-if [ $? -ne 0 ]; then
-  echo "ERROR: Environment check failed. Exiting."
-  exit 1
-fi
 
-# Build Phase 1 - Create the AD instance
+# ------------------------------------------------------------------------------
+# Phase 1: Directory Service
+# ------------------------------------------------------------------------------
+
+echo "NOTE: Deploying Directory Service..."
 
 cd 01-directory
 
@@ -19,12 +40,23 @@ terraform apply -auto-approve
 
 cd ..
 
-# Build Phase 2 - Create EC2 Instances
+exit 0
+
+# ------------------------------------------------------------------------------
+# Phase 2: EC2 Servers
+# ------------------------------------------------------------------------------
+
+echo "NOTE: Deploying Test EC2 instances..."
 
 cd 02-servers
 
 terraform init
 terraform apply -auto-approve
 
-cd .. 
+cd ..
 
+# ------------------------------------------------------------------------------
+# Completed
+# ------------------------------------------------------------------------------
+
+echo "NOTE: Deployment complete."
