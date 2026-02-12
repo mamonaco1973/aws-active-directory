@@ -43,10 +43,10 @@ print_directory_info() {
 
   echo "NOTE: Directory INFO:"
   echo ""
-  echo "  Name : ${DIRECTORY_NAME}"
-  echo "  ID   : ${dir_id}"
-  echo "  Stage: ${stage}"
-  echo "  DNS  : ${dns}"
+  echo "      Name : ${DIRECTORY_NAME}"
+  echo "      ID   : ${dir_id}"
+  echo "      Stage: ${stage}"
+  echo "      DNS  : ${dns}"
 }
 
 windows_dns="$(get_public_dns_by_name_tag "windows-ad-instance")"
