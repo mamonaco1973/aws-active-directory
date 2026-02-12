@@ -46,6 +46,8 @@ resource "aws_directory_service_directory" "ad_directory" {
       aws_subnet.ad-subnet-2.id
     ]
   }
+
+  depends_on = [ aws_nat_gateway.ad_nat ]
 }
 
 
