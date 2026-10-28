@@ -1,173 +1,150 @@
-# AWS Directory Service
+# AWS Managed Microsoft AD (AWS Directory Service)
 
-This is Part 1 of the Series: [Deploying Active Directory in the Cloud](https://youtu.be/H5lKJPJBL5s)
+Part 1 of the series
+[Deploying Active Directory in the Cloud](https://youtu.be/H5lKJPJBL5s).
+Terraform builds **AWS Managed Microsoft AD**, AWS's fully managed Active
+Directory, then a Linux and a Windows instance that join the domain at boot.
+The Windows instance also creates the lab's users and groups, with the POSIX
+attributes Linux needs.
 
-## Introduction
+| Piece | Where | Role |
+|---|---|---|
+| **AWS Managed Microsoft AD** | `ad-subnet-1` / `ad-subnet-2` (us-east-2a, us-east-2b) | Standard edition, domain `mcloud.mikecloud.com` / `MCLOUD`; two AWS-managed domain controllers; the VPC's DHCP options point DNS at them |
+| **linux-ad-instance** | `vm-subnet-1` | Ubuntu 24.04, `t2.micro`; joins with `realm` and SSSD; SSH with AD passwords |
+| **windows-ad-instance** | `vm-subnet-1` | Windows Server 2022, `t2.medium`; joins the domain; installs RSAT; creates the AD groups and users |
+| **Secrets Manager** | regional | `admin_ad_credentials_ds` and `<user>_ad_credentials_ds` |
+| **NAT gateway** | public subnet | outbound internet for the AD subnets |
 
-In this video, we will demonstrate the deployment of **AWS Directory Service**, a fully managed **Active Directory** solution in AWS, while covering the following tasks:  
+## Architecture
 
-- **Configure secure networking** by setting up subnets and security groups to allow domain connectivity.  
-- **Deploy AWS Directory Service** within an Amazon VPC for seamless directory-aware workloads.  
-- **Join both Windows and Linux servers** to the Active Directory domain.  
-- **Configure SSSD** ([System Security Services Daemon](https://sssd.io/)) for Linux authentication with Active Directory.  
-- **Integrate with AWS Secrets Manager** to securely store and retrieve administrator credentials.  
-- **Manage directory objects and policies**, including users, groups, and Organizational Units (OUs).   
-- **Clean up resources** by decommissioning all infrastructure provisioned during the process.  
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="architecture-dark.svg">
+  <img alt="AWS Managed Microsoft AD runs two domain controllers in private subnets in two availability zones, and the VPC's DHCP options point DNS at them. An Ubuntu instance and a Windows Server 2022 instance in public subnets read the AD admin password from Secrets Manager at boot and join the domain, the Linux one with realm and SSSD; the Windows one also creates the lab's groups and users with POSIX attributes. An SSH client reaches the Linux instance and an RDP client the Windows one, signing in with AD accounts." src="architecture-light.svg">
+</picture>
 
-This tutorial will help you understand **AWS Directory Service** and how to use it for **identity management in AWS environments**.
+Regenerate with `python3 make_diagram.py`.
 
-![AWS diagram](aws-directory.png)
+- **`01-directory/`**: the VPC (`directory-vpc`, 10.0.0.0/24) with two
+  public VM subnets and two private AD subnets, the NAT gateway, the
+  directory and its DHCP options, and the AD passwords in Secrets Manager.
+- **`02-servers/`**: the Linux and Windows instances, their IAM role (SSM
+  plus read access to the AD secrets), and security groups.
+
+## How the members join
+
+AWS creates the directory's `Admin` account, with Domain Admin rights, using
+the password Terraform stores in `admin_ad_credentials_ds`.
+
+1. **Windows**: installs RSAT and the AWS CLI, reads the admin secret, and
+   joins with `Add-Computer`. It then creates the groups and, from each
+   user's secret, the users, each with a `uidNumber` and `gidNumber`; adds
+   `MCLOUD\mcloud-users` to Remote Desktop Users; and reboots. It skips
+   anything that already exists, so it's safe to re-run.
+2. **Linux**: reads the admin secret and joins with `realm join`. SSSD is set
+   for short names and the POSIX IDs stored in AD; SSH accepts passwords;
+   home directories are created on first login; `linux-admins` get
+   passwordless sudo.
+
+| User | Groups | uidNumber | sudo on Linux |
+|---|---|---|---|
+| jsmith | mcloud-users, us, linux-admins | 10001 | yes |
+| edavis | mcloud-users, us | 10002 | no |
+| rpatel | mcloud-users, india, linux-admins | 10003 | yes |
+| akumar | mcloud-users, india | 10004 | no |
+
+| Group | gidNumber |
+|---|---|
+| mcloud-users | 10001 |
+| india | 10002 |
+| us | 10003 |
+| linux-admins | 10004 |
+
+Every user's primary `gidNumber` is 10001 (`mcloud-users`). Linux sees users
+only once they have these attributes, which is why the Windows host sets
+them.
+
+## Security groups
+
+```
+internet ─22, 443───▶ linux-ad-instance
+internet ─3389, 443─▶ windows-ad-instance
+```
+
+`ad-ssh-security-group`, `ad-rdp-security-group` and
+`ad-ssm-security-group` allow those ports from `0.0.0.0/0`; every login still
+needs an AD account. The domain controllers have no public address. Both
+instances are also reachable through **SSM Session Manager**.
 
 ## Prerequisites
 
 * [An AWS Account](https://aws.amazon.com/console/)
-* [Install AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) 
-* [Install Latest Terraform](https://developer.hashicorp.com/terraform/install)
+* [Install AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
+* [Install Terraform](https://developer.hashicorp.com/terraform/install)
+* [Install jq](https://jqlang.github.io/jq/download/)
 
-If this is your first time watching our content, we recommend starting with this video: [AWS + Terraform: Easy Setup](https://youtu.be/BCMQo0CB9wk). It provides a step-by-step guide to properly configure Terraform, Packer, and the AWS CLI.
+If this is your first time watching our content, we recommend starting with
+this video: [AWS + Terraform: Easy Setup](https://youtu.be/BCMQo0CB9wk).
 
-## Download this Repository
+## Deploy
 
 ```bash
 git clone https://github.com/mamonaco1973/aws-active-directory.git
 cd aws-active-directory
+./apply.sh       # 1: VPC + Managed AD + secrets  2: Linux and Windows instances
 ```
 
-## Build the Code
+Everything deploys to `us-east-2`. Phase 1 takes **30–60 minutes**, almost
+all of it AWS creating the directory. After phase 2, the Windows instance
+needs several minutes to join, create the users and reboot; the Linux
+instance can't resolve AD users until they exist. `apply.sh` ends by running
+`validate.sh`, which prints the directory's ID, stage and DNS addresses, and:
 
-Run [check_env](check_env.sh) then run [apply](apply.sh).
+```
+NOTE: Windows RDP Host FQDN: ec2-203-0-113-10.us-east-2.compute.amazonaws.com
+NOTE: Linux SSH Host FQDN:  ec2-203-0-113-20.us-east-2.compute.amazonaws.com
+```
+
+## Try it
+
+1. Get a user's password:
+
+   ```bash
+   aws secretsmanager get-secret-value --secret-id jsmith_ad_credentials_ds \
+     --query SecretString --output text | jq -r .password
+   ```
+
+2. Look at the directory in the console under **Directory Service**:
+
+   ![Directory details](console1.png)
+
+   ![EC2 instances](console2.png)
+
+3. RDP to the **Windows RDP Host** as `MCLOUD\jsmith`. **Active Directory
+   Users and Computers** shows the users and groups the instance created.
+
+   ![Windows instance](windows.png)
+
+4. SSH to the **Linux SSH Host** as `jsmith`. Try `id`,
+   `getent group linux-admins` and `sudo -l`.
+
+   ![Linux instance](linux.png)
+
+## Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| Phase 1 seems stuck | Creating a Managed AD directory takes 30–60 minutes. |
+| `id jsmith` finds nothing on Linux | The Windows instance hasn't created the users yet; wait for it to reboot. SSSD caches lookups; `sudo sss_cache -E` clears it. |
+| SSH rejects every AD password | `aws ssm start-session --target <instance-id>`, then `sudo tail /root/userdata.log`. |
+
+## Teardown
 
 ```bash
-develop-vm:~/aws-active-directory$ ./apply.sh
-NOTE: Validating that required commands are found in your PATH.
-NOTE: aws is found in the current PATH.
-NOTE: terraform is found in the current PATH.
-NOTE: All required commands are available.
-NOTE: Checking AWS cli connection.
-NOTE: Successfully logged into AWS.
-Initializing the backend...
-Initializing provider plugins...
-- Reusing previous version of hashicorp/random from the dependency lock file
-- Reusing previous version of hashicorp/aws from the dependency lock file
-- Using previously-installed hashicorp/random v3.7.1
-- Using previously-installed hashicorp/aws v5.89.0
-
-Terraform has been successfully initialized!
-
-You may now begin working with Terraform. Try running "terraform plan" to see
-any changes that are required for your infrastructure. All Terraform commands
-should now work.
-
-If you ever set or change modules or backend configuration for Terraform,
-rerun this command to reinitialize your working directory. If you forget, other
-commands will detect it and remind you to do so if necessary.
-
-[...]
+./destroy.sh     # destroys the instances, deletes the AD secrets, destroys the directory and VPC
 ```
 
-### Build Process Overview  
+## Notes
 
-The build process consists of two phases:  
-
-1. **Phase 1:** Use Terraform to provision the required networking and deploy the AWS Directory Service instance. This phase takes approximately **30-60 minutes** to complete.  
-2. **Phase 2:** Once the directory service is provisioned, deploy a Linux and a Windows EC2 instance. Their respective **user data scripts** will automatically join them to the domain during initialization.  
-
-## Tour of Build Output in the AWS Console
-
-- **Networking**
-- **The Active Directory Instance**
-- **Secrets Manager**
-- **The Windows EC2 Instance**
-- **The Linux EC2 Instance**
-
-![AWS Directory](console1.png)
-
-![AWS EC2 Instance](console2.png)
-
-### Retrieving Initial Admin Credentials
-
-Once your **AWS Directory** instance is provisioned, AWS automatically creates the **`Admin`** user account within the directory. This account has **Domain Admin** privileges, allowing you to perform administrative tasks like creating Organizational Units (OUs), managing Group Policy, and adding users. You can set the Admin password directly in the console and directly in the terraform. In this project we store the **`Admin`** credentials in the `admin_ad_credentials` secret.
-
-### Users and Groups
-
-As part of this project, when the Windows instance boots and successfully joins Active Directory, a set of **users** and **groups** are automatically created through a scripted process. These resources are intended for **testing and demonstration purposes**, showcasing how to automate user and group provisioning in a cloud-integrated Active Directory environment.
-
-#### Groups Created
-
-| Group Name    | Group Category | Group Scope | gidNumber |
-|----------------|----------------|----------------|------------|
-| mcloud-users   | Security       | Universal     | 10001 |
-| india          | Security       | Universal     | 10002 |
-| us             | Security       | Universal     | 10003 |
-| linux-admins   | Security       | Universal     | 10004 |
-
-#### Users Created and Group Memberships
-
-| Username | Full Name   | uidNumber | gidNumber | Groups Joined                    |
-|---------|------------|-----------|-----------|----------------------|
-| jsmith  | John Smith  | 10001 | 10001 | mcloud-users, us, linux-admins |
-| edavis  | Emily Davis | 10002 | 10001 | mcloud-users, us |
-| rpatel  | Raj Patel   | 10003 | 10001 | mcloud-users, india, linux-admins |
-| akumar  | Amit Kumar  | 10004 | 10001 | mcloud-users, india |
-
----
-
-
-#### Understanding `uidNumber` and `gidNumber` for Linux Integration
-
-The **`uidNumber`** (User ID) and **`gidNumber`** (Group ID) attributes are critical when integrating **Active Directory** with **Linux systems**, particularly in environments where **SSSD** ([System Security Services Daemon](https://sssd.io/)) or similar services are used for identity management. These attributes allow Linux hosts to recognize and map Active Directory users and groups into the **POSIX** (Portable Operating System Interface) user and group model.
-
-### Log into Windows Instance  
-
-When the Windows instance boots, the [userdata script](02-servers/scripts/userdata.ps1) executes the following tasks:  
-
-- Install Active Directory Administrative Tools  
-- AWS CLI Installation  
-- Join EC2 Instance to Active Directory  
-- Create Active Directory Groups  
-- Create Active Directory Users and Assign to Groups  
-- Grant RDP Access  
-- Final System Reboot  
-
-Administrator credentials are stored in the `admin_ad_credentials` secret.
-
-![Windows EC2 Instance](windows.png)
-
-### Log into Linux Instance  
-
-When the Linux instance boots, the [userdata script](02-servers/scripts/userdata.sh) runs the following tasks:  
-
-- Update OS and install required packages  
-- Install AWS CLI  
-- Join the Active Directory domain with SSSD  
-- Enable password authentication for AD users  
-- Configure SSSD for AD integration  
-- Grant sudo privileges to the `linux-admins` group  
-
-Linux user credentials are stored as secrets.
-
-![Linux EC2 Instance](linux.png)
-
-## Run the "destroy" script when you are done
-
-```bash
-~/aws-active-directory$ ./destroy.sh
-Initializing the backend...
-Initializing provider plugins...
-- Reusing previous version of hashicorp/aws from the dependency lock file
-- Using previously-installed hashicorp/aws v5.89.0
-
-Terraform has been successfully initialized!
-
-You may now begin working with Terraform. Try running "terraform plan" to see
-any changes that are required for your infrastructure. All Terraform commands
-should now work.
-
-If you ever set or change modules or backend configuration for Terraform,
-rerun this command to reinitialize your working directory. If you forget, other
-commands will detect it and remind you to do so if necessary.
-data.aws_ami.ubuntu_ami: Reading...
-data.aws_ami.windows_ami: Reading...
-[...]
-```
-
+- **Lab only.** SSH and RDP are open to the internet, and both joins use the
+  domain `Admin` account. Restrict the security groups and use a dedicated
+  join account for anything more.
